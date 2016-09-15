@@ -157,20 +157,23 @@ class SlackPlugin(notify.NotificationPlugin):
 
         fields = []
 
+        excluded_tags = set(self.get_tag_list('excluded_tag_keys', project) or [])
+        included_tags = set(self.get_tag_list('included_tag_keys', project) or [])
         # They can be the same if there is no culprit
         # So we set culprit to an empty string instead of duplicating the text
-        if culprit and title != culprit:
+        if 'culprit' not in excluded_tags and culprit and title != culprit:
             fields.append({
                 'title': 'Culprit',
                 'value': culprit,
                 'short': False,
             })
 
-        fields.append({
-            'title': 'Project',
-            'value': project_name,
-            'short': True,
-        })
+        if 'project' not in excluded_tags:
+            fields.append({
+                'title': 'Project',
+                'value': project_name,
+                'short': True,
+            })
 
         if self.get_option('include_rules', project):
             rules = []
@@ -191,8 +194,6 @@ class SlackPlugin(notify.NotificationPlugin):
                 })
 
         if self.get_option('include_tags', project):
-            included_tags = set(self.get_tag_list('included_tag_keys', project) or [])
-            excluded_tags = set(self.get_tag_list('excluded_tag_keys', project) or [])
             for tag_key, tag_value in self._get_tags(event):
                 key = tag_key.lower()
                 std_key = TagKey.get_standardized_key(key)
@@ -210,10 +211,12 @@ class SlackPlugin(notify.NotificationPlugin):
             'parse': 'none',
             'attachments': [{
                 'fallback': '[%s] %s' % (project_name, title),
+                'pretext': '<!channel>',
                 'title': title,
                 'title_link': group.get_absolute_url(),
                 'color': self.color_for_event(event),
-                'fields': fields,
+                'text': '\n'.join(['*{title}:* {value}'.format(**field) for field in fields]),
+                'mrkdwn_in': ['text'],
             }]
         }
 
